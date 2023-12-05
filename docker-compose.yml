@@ -1,0 +1,115 @@
+# The following items will need to be configured prior to running this file: 
+# 1) Create your docker directory. I personally use /etc/docker-configs. You can use the mkdir command for this.
+# 2) Mount your NAS fileshares. Only one is necessary for media storage, if you only have one network share you can remove the additional volumes from each container. 
+# 4) Add your dockerDir and nasDir0 (plus additional NAS directories if needed) to the accompanying .env file
+# 3) Your NAS fileshaores should be set up with the following subdirectories: 
+# movies
+# movieDownload
+# tv
+# tvDownload
+# defaultDownload
+# Note: This is Linux, so all file paths and basically everything else is case sensitive. 
+# Once this is running without error, refer to https://trash-guides.info/ for best practices and setup instructions for setting up each of the containers. 
+# Inside this file, there are (currently) six containers: Jellyfin, JellySeerr, Sonarr, Radarr, Prowlarr, and Bazarr. 
+# Jellyfin will serve your media (think yarr-harr netflix)
+# Jellyseerr will add a nice friendly UI so your fiance can just log in and select a movie to queue the download, instead of harassing you for it. 
+# Sonarr/Radarr will handle organizing your media and queuing downloads
+# Prowlarr will manage your indexers, like IPTorrents, NZBGeek, etc
+# Bazarr scans your library and auto-downloads subtitles. 
+---
+version: "2.1"
+services:
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${timeZone}
+    volumes:
+      - ${dockerDir}/sonarr/config:/config
+      - ${nasDir0}/tv:/tv0
+      - ${nasDir1}/tv:/tv1 #optional
+      - ${nasDir0}/tvDownload:/downloads0
+      - ${nasDir1}/tvDownload:/downloads1 #optional
+      - ${nasDir0}/defaultDownload:/miscDownload0
+      - ${nasDir1}/defaultDownload:/miscDownload1 #optional
+    ports:
+      - 8989:8989
+      - 8990:8990
+    restart: unless-stopped
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${timeZone}
+    volumes:
+      - ${dockerDir}/radarr/config:/config
+      - ${nasDir0}/movies:/movies0
+      - ${nasDir1}/movies:/movies1 #optional
+      - ${nasDir0}/movieDownload:/downloads0
+      - ${nasDir1}/movieDownload:/downloads1 #optional
+      - ${nasDir0}/defaultDownload:/miscDownload0
+      - ${nasDir1}/defaultDownload:/miscDownload1 #optional
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${timeZone}
+    volumes:
+      - ${dockerDir}/prowlarr/config:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${timeZone}
+      - JELLYFIN_PublishedServerUrl=${jellyfinPublishedAddress} #optional, set in .env file
+    volumes:
+      - ${dockerDir}/jellyfin/config:/config
+      - ${nasDir0}:/data/nasDir0
+      - ${nasDir1}:/data/nasDir1
+    ports:
+      - 8096:8096
+      - 8920:8920 #optional
+      - 7359:7359/udp #optional
+      - 1900:1900/udp #optional
+    restart: unless-stopped
+  jellyseerr:
+      container_name: jellyseerr
+      environment:
+          - LOG_LEVEL=debug
+          - TZ=${timeZone}
+      ports:
+          - 5055:5055
+      volumes:
+          - ${dockerDir}/jellyseerr/config:/app/config
+      restart: unless-stopped
+      image: 'fallenbagel/jellyseerr:latest'
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${timeZone}
+    volumes:
+      - ${dockerDir}/bazarr/config:/config
+      - ${nasDir0}/movies:/movies0
+      - ${nasDir1}/movies:/movies1 #optional
+      - ${nasDir0}/tv:/tv0
+      - ${nasDir1}/tv:/tv1 #optional
+    ports:
+      - 6767:6767
+    restart: unless-stopped
